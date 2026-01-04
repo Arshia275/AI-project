@@ -83,10 +83,8 @@ if df is None:
 @st.cache_resource
 def train_model(df):
     if 'final_score' not in df.columns:
-        st.error("Dataset is missing 'final_score' column.")
         return None, None, None, None, None, None
 
-    # Target is final_score directly
     X = df.drop(['final_score'], axis=1)
     y = df['final_score']
     
@@ -109,7 +107,6 @@ def train_model(df):
         X_scaled, y, test_size=0.2, random_state=42
     )
     
-    # Using Regressor
     model = RandomForestRegressor(
         n_estimators=200,
         max_depth=15,
@@ -135,7 +132,12 @@ def train_model(df):
     
     return model, feature_names, label_encoders, metrics, test_data, scaler
 
+# Unpack results safely
 model, feature_names, label_encoders, metrics, test_data, scaler = train_model(df)
+
+if model is None:
+    st.error("Error: The dataset must contain a 'final_score' column.")
+    st.stop()
 
 def prepare_input(input_df):
     X_input = input_df.copy()
@@ -163,112 +165,106 @@ def get_top_features(n=10):
     return [(feature_names[i], importances[i]) for i in indices]
 
 # 5. UI Layout
-if model is not None:
-    tab1, tab2, tab3, tab4 = st.tabs(["Prediction", "Analytics", "Features", "About"])
+tab1, tab2, tab3, tab4 = st.tabs(["Prediction", "Analytics", "Features", "About"])
 
-    with tab1:
-        st.header("Student Profile")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.subheader("Demographics")
-            grade = st.selectbox("Grade Level", ['10th', '11th', '12th', '1st Year', '2nd Year', '3rd Year'])
-            gender = st.selectbox("Gender", ['Male', 'Female', 'Other'])
-            age = st.number_input("Age", 15, 35, 20)
-            improve = st.number_input("Improvement Rate (%)", -20.0, 50.0, 10.0)
-        with col2:
-            st.subheader("Lifestyle")
-            study = st.number_input("Study Hours/Day", 0.0, 15.0, 3.5)
-            sleep = st.number_input("Sleep Hours/Day", 0.0, 12.0, 7.0)
-            social = st.number_input("Social Media Hours/Day", 0.0, 12.0, 2.5)
-            concept = st.slider("Concept Understanding", 1, 10, 6)
-        with col3:
-            st.subheader("AI Usage")
-            ai_time = st.number_input("AI Usage (Min/Day)", 0, 300, 60)
-            ai_content = st.slider("AI Generated %", 0, 100, 30)
-            ai_depend = st.slider("AI Dependency", 1, 10, 5)
-            particip = st.slider("Class Participation", 1, 10, 6)
+with tab1:
+    st.header("Student Profile")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.subheader("Demographics")
+        grade = st.selectbox("Grade Level", ['10th', '11th', '12th', '1st Year', '2nd Year', '3rd Year'])
+        gender = st.selectbox("Gender", ['Male', 'Female', 'Other'])
+        age = st.number_input("Age", 15, 35, 20)
+        improve = st.number_input("Improvement Rate (%)", -20.0, 50.0, 10.0)
+    with col2:
+        st.subheader("Lifestyle")
+        study = st.number_input("Study Hours/Day", 0.0, 15.0, 3.5)
+        sleep = st.number_input("Sleep Hours/Day", 0.0, 12.0, 7.0)
+        social = st.number_input("Social Media Hours/Day", 0.0, 12.0, 2.5)
+        concept = st.slider("Concept Understanding", 1, 10, 6)
+    with col3:
+        st.subheader("AI Usage")
+        ai_time = st.number_input("AI Usage (Min/Day)", 0, 300, 60)
+        ai_content = st.slider("AI Generated %", 0, 100, 30)
+        ai_depend = st.slider("AI Dependency", 1, 10, 5)
+        particip = st.slider("Class Participation", 1, 10, 6)
 
-        st.divider()
+    st.divider()
+    
+    input_data = pd.DataFrame({
+        'age': [age], 'gender': [gender], 'grade_level': [grade],
+        'study_hours_per_day': [study], 'uses_ai': [1],
+        'ai_usage_time_minutes': [ai_time], 'ai_tools_used': ['ChatGPT'],
+        'ai_usage_purpose': ['Notes'], 'ai_dependency_score': [ai_depend],
+        'ai_generated_content_percentage': [ai_content], 'ai_prompts_per_week': [50],
+        'ai_ethics_score': [5], 'concept_understanding_score': [concept],
+        'study_consistency_index': [5.5], 'improvement_rate': [improve],
+        'sleep_hours': [sleep], 'social_media_hours': [social],
+        'tutoring_hours': [2.0], 'class_participation_score': [particip]
+    })
+    
+    if st.button("Predict Final Score", use_container_width=True):
+        prepared = prepare_input(input_data)
+        predicted_score = model.predict(prepared)[0]
         
-        # Build input for prediction
-        input_data = pd.DataFrame({
-            'age': [age], 'gender': [gender], 'grade_level': [grade],
-            'study_hours_per_day': [study], 'uses_ai': [1],
-            'ai_usage_time_minutes': [ai_time], 'ai_tools_used': ['ChatGPT'],
-            'ai_usage_purpose': ['Notes'], 'ai_dependency_score': [ai_depend],
-            'ai_generated_content_percentage': [ai_content], 'ai_prompts_per_week': [50],
-            'ai_ethics_score': [5], 'concept_understanding_score': [concept],
-            'study_consistency_index': [5.5], 'improvement_rate': [improve],
-            'sleep_hours': [sleep], 'social_media_hours': [social],
-            'tutoring_hours': [2.0], 'class_participation_score': [particip]
-        })
+        st.markdown(f"""
+        <div class="prediction-card">
+            <h3>Predicted Final Score</h3>
+            <div class="score-display">{predicted_score:.1f} / 100</div>
+            <p>Status: {"🟢 PASS" if predicted_score >= 50 else "🔴 AT RISK (FAIL)"}</p>
+        </div>
+        """, unsafe_allow_html=True)
         
-        if st.button("Predict Final Score", use_container_width=True):
-            prepared = prepare_input(input_data)
-            predicted_score = model.predict(prepared)[0]
-            
-            st.markdown(f"""
-            <div class="prediction-card">
-                <h3>Predicted Final Score</h3>
-                <div class="score-display">{predicted_score:.1f} / 100</div>
-                <p>Status: {"🟢 PASS" if predicted_score >= 50 else "🔴 AT RISK (FAIL)"}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Confidence/Error Indicator
-            fig = go.Figure(go.Indicator(
-                mode = "gauge+number",
-                value = predicted_score,
-                domain = {'x': [0, 1], 'y': [0, 1]},
-                title = {'text': "Predicted Score Gauge"},
-                gauge = {
-                    'axis': {'range': [0, 100]},
-                    'bar': {'color': "#6366f1"},
-                    'steps': [
-                        {'range': [0, 50], 'color': "rgba(239, 68, 68, 0.2)"},
-                        {'range': [50, 100], 'color': "rgba(16, 185, 129, 0.2)"}
-                    ],
-                    'threshold': {'line': {'color': "white", 'width': 4}, 'thickness': 0.75, 'value': predicted_score}
-                }
-            ))
-            fig.update_layout(template="plotly_dark", height=300)
-            st.plotly_chart(fig, use_container_width=True)
+        fig = go.Figure(go.Indicator(
+            mode = "gauge+number",
+            value = predicted_score,
+            domain = {'x': [0, 1], 'y': [0, 1]},
+            title = {'text': "Predicted Score Gauge"},
+            gauge = {
+                'axis': {'range': [0, 100]},
+                'bar': {'color': "#6366f1"},
+                'steps': [
+                    {'range': [0, 50], 'color': "rgba(239, 68, 68, 0.2)"},
+                    {'range': [50, 100], 'color': "rgba(16, 185, 129, 0.2)"}
+                ]
+            }
+        ))
+        fig.update_layout(template="plotly_dark", height=300)
+        st.plotly_chart(fig, use_container_width=True)
 
-    with tab2:
-        st.header("Regression Analysis")
-        m1, m2, m3 = st.columns(3)
-        m1.metric("R-Squared (Accuracy)", f"{metrics['r2']:.3f}")
-        m2.metric("Mean Absolute Error", f"{metrics['mae']:.2f} pts")
-        m3.metric("RMSE", f"{metrics['rmse']:.2f} pts")
+with tab2:
+    st.header("Regression Analysis")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("R-Squared", f"{metrics['r2']:.3f}")
+    m2.metric("Mean Absolute Error", f"{metrics['mae']:.2f} pts")
+    m3.metric("RMSE", f"{metrics['rmse']:.2f} pts")
+    
+    st.divider()
+    c_left, c_right = st.columns(2)
+    
+    with c_left:
+        plot_df = pd.DataFrame({'Actual': test_data['y_test'], 'Predicted': test_data['y_pred']})
+        fig_scatter = px.scatter(plot_df, x='Actual', y='Predicted', 
+                               title="Actual vs. Predicted Scores",
+                               trendline="ols", template="plotly_dark")
+        st.plotly_chart(fig_scatter, use_container_width=True)
         
-        st.divider()
-        c_left, c_right = st.columns(2)
-        
-        with c_left:
-            # Actual vs Predicted
-            plot_df = pd.DataFrame({'Actual': test_data['y_test'], 'Predicted': test_data['y_pred']})
-            fig_scatter = px.scatter(plot_df, x='Actual', y='Predicted', 
-                                   title="Actual vs. Predicted Scores",
-                                   trendline="ols", template="plotly_dark")
-            st.plotly_chart(fig_scatter, use_container_width=True)
-            
-        with c_right:
-            # Feature Importance
-            top_all = get_top_features(10)
-            fig_imp = go.Figure(data=[go.Bar(y=[f[0].replace('_',' ').title() for f in top_all], x=[f[1] for f in top_all], orientation='h', marker_color='#6366f1')])
-            fig_imp.update_layout(title="Top Score Influencers", xaxis_title="Importance", height=400, template="plotly_dark", yaxis=dict(autorange="reversed"))
-            st.plotly_chart(fig_imp, use_container_width=True)
+    with c_right:
+        top_all = get_top_features(10)
+        fig_imp = go.Figure(data=[go.Bar(y=[f[0].replace('_',' ').title() for f in top_all], x=[f[1] for f in top_all], orientation='h', marker_color='#6366f1')])
+        fig_imp.update_layout(title="Top Score Influencers", xaxis_title="Importance", height=400, template="plotly_dark", yaxis=dict(autorange="reversed"))
+        st.plotly_chart(fig_imp, use_container_width=True)
 
-    with tab3:
-        st.header("Dataset Features")
-        st.write("Model predicts the `final_score` (0-100) using 19 behavioral and academic features.")
-        st.dataframe(df.head(10))
+with tab3:
+    st.header("Dataset Features")
+    st.write("Model predicts the `final_score` (0-100) using 19 behavioral and academic features.")
+    st.dataframe(df.head(10))
 
-    with tab4:
-        st.header("About the Model")
-        st.markdown("""
-        - **Model Type**: Random Forest Regressor
-        - **Target**: `final_score` (Continuous Numerical)
-        - **Training Size**: 80% of dataset
-        - **Goal**: Help educators identify specific score outcomes based on student habits.
-        """)
+with tab4:
+    st.header("About the Model")
+    st.markdown("""
+    - **Model Type**: Random Forest Regressor
+    - **Target**: `final_score` (Continuous Numerical)
+    - **Training Size**: 80% of dataset
+    - **Goal**: Predict numerical academic performance outcomes.
+    """)
