@@ -9,7 +9,8 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import plotly.graph_objects as go
 import plotly.express as px
 import warnings
-warnings.filterwarnings('ignore')
+
+warnings.filterwarnings("ignore")
 
 # 1. Page Configuration
 st.set_page_config(
